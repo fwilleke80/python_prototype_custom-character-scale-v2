@@ -22,6 +22,9 @@ pygame.display.set_caption("Dynamic Mouse Circle with Random Points")
 # Font setup
 font = pygame.font.Font(None, 24)  # Default font, size 24
 
+# Number of points
+num_points = 8
+
 # Generate 10 random control points
 def generate_random_points(num_points, width, height, scale_min, scale_max):
     points = []
@@ -33,7 +36,7 @@ def generate_random_points(num_points, width, height, scale_min, scale_max):
     return points
 
 # Generate control points
-control_points = generate_random_points(10, WIDTH, HEIGHT, 10, 150)
+control_points = generate_random_points(num_points, WIDTH, HEIGHT, 10, 150)
 
 # Function to compute distance
 def distance(point1, point2):
@@ -41,7 +44,7 @@ def distance(point1, point2):
     dy = point1[1] - point2[1]
     return math.sqrt(dx ** 2 + dy ** 2)
 
-# Port of getObjectScale
+# Computes a scale from the participating points.
 def get_object_scale(control_points, object_pos):
     epsilon = 1e-6  # Small value to prevent division by zero
     weighted_sum = 0.0
@@ -58,15 +61,17 @@ def get_object_scale(control_points, object_pos):
 
 # Main loop
 clock = pygame.time.Clock()
-
 while True:
+    # Handle events
     for event in pygame.event.get():
+        # Quit
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
 
         # Handle key presses
         if event.type == pygame.KEYDOWN:
+            # SPACE key
             if event.key == pygame.K_SPACE:
                 # Generate a new set of control points
                 control_points = generate_random_points(10, WIDTH, HEIGHT, 10, 150)
@@ -93,10 +98,10 @@ while True:
         screen.blit(size_text, (x + size + 5, y - 10))  # Offset text slightly to the right and up
 
     # Draw circle around the mouse cursor
-    pygame.draw.circle(screen, YELLOW, (mouse_x, mouse_y), int(mouse_circle_radius), 1)
+    pygame.draw.circle(screen, YELLOW, mouse_pos, int(mouse_circle_radius), 1)
 
     # Display mouse circle size as text
-    radius_text = font.render(f"Radius: {mouse_circle_radius:.2f}", True, WHITE)
+    radius_text = font.render(f"{mouse_circle_radius:.2f}", True, WHITE)
     screen.blit(radius_text, (mouse_x + int(mouse_circle_radius) + 10, mouse_y - 10))  # Offset text to the right
 
     # Update the display
