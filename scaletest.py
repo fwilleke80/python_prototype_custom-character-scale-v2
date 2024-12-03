@@ -1,4 +1,5 @@
 import pygame
+import pygame.gfxdraw
 import sys
 import math
 import random
@@ -17,6 +18,7 @@ BACKGROUND = (32, 32, 96)
 BACKGROUND_BRIGHT = (64, 64, 192)
 CONTROLPOINT = (128, 0, 0)
 CONTROLPOINT_RADIUS = (255, 160, 64)
+MOUSE_CENTER = (0, 0, 0)
 RESULT_RADIUS = (255, 255, 0)
 
 # Initialize screen
@@ -54,6 +56,7 @@ def distance(point1, point2):
 # Settings
 draw_outlines = True
 draw_shaded = True
+draw_antialiased = True
 
 # Weighting modes
 weighting_mode = 0
@@ -269,6 +272,7 @@ def blend_color(color1: tuple, color2: tuple, t: float) -> tuple:
 def map_01_to_range(val: float, minimum: float, maximum: float) -> float:
     return minimum + val * (maximum - minimum)
 
+
 # Main loop
 clock = pygame.time.Clock()
 current_scale = default_scale
@@ -305,6 +309,9 @@ while True:
             # Toggle shading
             elif event.key == pygame.K_c:
                 draw_shaded = not draw_shaded
+            # Toggle antialiasing
+            elif event.key == pygame.K_a:
+                draw_antialiased = not draw_antialiased
         # Mouse input
         elif event.type == pygame.MOUSEBUTTONDOWN:
             handle_mouse_click(event, control_points, current_scale if current_scale != 0 else default_scale)
@@ -362,7 +369,10 @@ while True:
             radius_color = blend_color(BACKGROUND, CONTROLPOINT_RADIUS, map_01_to_range(normalized_value, 0.15, 1.0))
 
             # Draw circle filled with adjusted brightness
-            pygame.draw.circle(screen, radius_color, (x, y), size)
+            if draw_antialiased:
+                pygame.gfxdraw.filled_circle(screen, x, y, size, radius_color)
+            else:
+                pygame.draw.circle(screen, radius_color, (x, y), size)
 
     # Prettier: Draw circle around mouse cursor (filled with adjusted brightness)
     if control_points:
@@ -377,14 +387,24 @@ while True:
             mouse_color = blend_color(BACKGROUND, CONTROLPOINT_RADIUS, map_01_to_range(normalized_mouse_value, 0.15, 1.0))
 
             # Draw the filled circle
-            pygame.draw.circle(screen, mouse_color, mouse_pos, int(mouse_circle_radius))
+            if draw_antialiased:
+                pygame.gfxdraw.filled_circle(screen, mouse_x, mouse_y, int(mouse_circle_radius), mouse_color)
+            else:
+                pygame.draw.circle(screen, mouse_color, mouse_pos, int(mouse_circle_radius))
 
             # Draw outline
             if draw_outlines:
-                pygame.draw.circle(screen, BLACK, mouse_pos, int(mouse_circle_radius), 1)
+                if draw_antialiased:
+                    pygame.gfxdraw.aacircle(screen, mouse_x, mouse_y, int(mouse_circle_radius), BLACK) # Antialiased outline
+                else:
+                    pygame.draw.circle(screen, BLACK, mouse_pos, int(mouse_circle_radius), 1)
         else:
             # Draw simple outline
-            pygame.draw.circle(screen, RESULT_RADIUS, mouse_pos, int(mouse_circle_radius), 1)
+            if draw_antialiased:
+                pygame.gfxdraw.aacircle(screen, mouse_x, mouse_y, int(mouse_circle_radius), RESULT_RADIUS) # Antialiased outline
+            else:
+                pygame.draw.circle(screen, RESULT_RADIUS, mouse_pos, int(mouse_circle_radius), 1)
+        pygame.draw.circle(screen, MOUSE_CENTER, (mouse_x, mouse_y), 2)
 
     # Control points draw pass 2: Draw control points center, outline, and text
     for point in control_points:
@@ -394,29 +414,35 @@ while True:
         if draw_shaded:
             # Draw circle outline
             if draw_outlines:
-                pygame.draw.circle(screen, BLACK, (x, y), size, 1)
+                if draw_antialiased:
+                    pygame.gfxdraw.aacircle(screen, x, y, size, BLACK) # Antialiased outline
+                else:
+                    pygame.draw.circle(screen, BLACK, (x, y), size, 1)
         else:
             # Draw simple circle outline
-            pygame.draw.circle(screen, CONTROLPOINT_RADIUS, (x, y), size, 1)
+            if draw_antialiased:
+                pygame.gfxdraw.aacircle(screen, x, y, size, CONTROLPOINT_RADIUS) # Antialiased outline
+            else:
+                pygame.draw.circle(screen, CONTROLPOINT_RADIUS, (x, y), size, 1)
 
         # Draw center point
         pygame.draw.circle(screen, CONTROLPOINT, (x, y), 2)
-        size_text = font.render(str(size), True, WHITE)
+        size_text = font.render(str(size), draw_antialiased, WHITE)
         screen.blit(size_text, (x + 5, y - 10))
 
     # Display text at mouse cursor
-    screen.blit(font.render(f"Scale: {mouse_circle_radius:.2f}", True, WHITE), (mouse_x + int(mouse_circle_radius) + 10, mouse_y - 10))
-    screen.blit(font.render(f"{weighting_mode_text}", True, WHITE), (mouse_x + int(mouse_circle_radius) + 10, mouse_y + 10))
+    screen.blit(font.render(f"Scale: {mouse_circle_radius:.2f}", draw_antialiased, WHITE), (mouse_x + int(mouse_circle_radius) + 10, mouse_y - 10))
+    screen.blit(font.render(f"{weighting_mode_text}", draw_antialiased, WHITE), (mouse_x + int(mouse_circle_radius) + 10, mouse_y + 10))
 
     # Display top text
-    screen.blit(font.render(f"Number of points: {len(control_points)}", True, GREY), (10, 10))
-    screen.blit(font.render(f"Weighting mode: {weighting_mode_text}", True, GREY), (10, 40))
-    screen.blit(font.render(f"Remapping mode: {remapping_modes[remapping_mode]}", True, GREY), (10, 60))
+    screen.blit(font.render(f"Number of points: {len(control_points)}", draw_antialiased, GREY), (10, 10))
+    screen.blit(font.render(f"Weighting mode: {weighting_mode_text}", draw_antialiased, GREY), (10, 40))
+    screen.blit(font.render(f"Remapping mode: {remapping_modes[remapping_mode]}", draw_antialiased, GREY), (10, 60))
 
     # Display bottom text
-    screen.blit(font.render("Display: Y=Cycle color remapping, X=Toggle outlines, C=Toggle shading", True, GREY), (10, 660))
-    screen.blit(font.render("Interpolation: B=Next weighting mode, N=Previous weighting mode", True, GREY), (10, 680))
-    screen.blit(font.render("Point management: SPACE=Regenerate points, UP=Add point, DOWN=Remove point, Left click: Add/Remove point, Right click: Set point value", True, GREY), (10, 700))
+    screen.blit(font.render("Display: Y=Cycle color remapping, X=Toggle outlines, C=Toggle shading, A=Toggle antialiasing", draw_antialiased, GREY), (10, 660))
+    screen.blit(font.render("Interpolation: B=Next weighting mode, N=Previous weighting mode", draw_antialiased, GREY), (10, 680))
+    screen.blit(font.render("Point management: SPACE=Regenerate points, UP=Add point, DOWN=Remove point, Left click: Add/Remove point, Right click: Set point value", draw_antialiased, GREY), (10, 700))
 
     pygame.display.flip()
     clock.tick(60)
