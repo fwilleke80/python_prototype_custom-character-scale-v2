@@ -13,6 +13,7 @@ WIDTH, HEIGHT = 1280, 720
 WHITE = (255, 255, 255)
 GREY = (160, 160, 160)
 BACKGROUND = (32, 32, 96)
+BACKGROUND_BRIGHT = (64, 64, 192)
 CONTROLPOINT = (255, 0, 0)
 CONTROLPOINT_RADIUS = (255, 64, 64)
 RESULT_RADIUS = (255, 255, 0)
@@ -27,18 +28,21 @@ font = pygame.font.Font(None, 24)  # Default font, size 24
 # Tolerance for detecting clicks on existing points
 tolerance_radius = 10
 
+# Default point value for manually added points
+default_scale = 50
+
 # Number of points
-num_points = 8
+initial_num_points = 3
 
 # Generate random control points
 def generate_random_point(width, height, scale_min, scale_max):
     x = random.randint(0, width - 1)
     y = random.randint(0, height - 1)
     scale_value = random.randint(scale_min, scale_max)
-    return {"pos": (x, y), "scaleValue": scale_value}
+    return {"pos": (x, y), "value": scale_value}
 
 # Generate initial control points
-control_points = [generate_random_point(WIDTH, HEIGHT, 10, 150) for _ in range(num_points)]
+control_points = [generate_random_point(WIDTH, HEIGHT, 10, 150) for _ in range(initial_num_points)]
 
 # Function to compute distance
 def distance(point1, point2):
@@ -68,7 +72,7 @@ def get_object_scale_linear(control_points, object_pos):
         dist = distance(point["pos"], object_pos)
         weight = 1.0 / (dist + epsilon)
 
-        weighted_sum += weight * point["scaleValue"]
+        weighted_sum += weight * point["value"]
         total_weight += weight
 
     return (weighted_sum / total_weight) if total_weight > epsilon else 0.0
@@ -83,7 +87,7 @@ def get_object_scale_inverse_square(control_points, object_pos):
         dist = distance(point["pos"], object_pos)
         weight = 1.0 / ((dist ** 2) + epsilon)
 
-        weighted_sum += weight * point["scaleValue"]
+        weighted_sum += weight * point["value"]
         total_weight += weight
 
     return (weighted_sum / total_weight) if total_weight > epsilon else 0.0
@@ -99,10 +103,10 @@ def get_object_scale_exponential(control_points, object_pos):
         dist = distance(point["pos"], object_pos)
         weight = math.exp(-dist * decay_factor)
 
-        weighted_sum += weight * point["scaleValue"]
+        weighted_sum += weight * point["value"]
         total_weight += weight
 
-    return (weighted_sum / total_weight) if total_weight > epsilon else sum(p["scaleValue"] for p in control_points) / len(control_points)
+    return (weighted_sum / total_weight) if total_weight > epsilon else sum(p["value"] for p in control_points) / len(control_points)
 
 # Gaussian Weighting
 def get_object_scale_gaussian(control_points, object_pos):
@@ -115,16 +119,16 @@ def get_object_scale_gaussian(control_points, object_pos):
         dist = distance(point["pos"], object_pos)
         weight = math.exp(-((dist ** 2) / (2 * (sigma ** 2))))
 
-        weighted_sum += weight * point["scaleValue"]
+        weighted_sum += weight * point["value"]
         total_weight += weight
 
-    return (weighted_sum / total_weight) if total_weight > epsilon else sum(p["scaleValue"] for p in control_points) / len(control_points)
+    return (weighted_sum / total_weight) if total_weight > epsilon else sum(p["value"] for p in control_points) / len(control_points)
 
 # Max-Nearby Influence
 def get_object_scale_max_nearby(control_points, object_pos, k=3):
     epsilon = 1e-8
     distances = [
-        (distance(point["pos"], object_pos), point["scaleValue"])
+        (distance(point["pos"], object_pos), point["value"])
         for point in control_points
     ]
     distances = sorted(distances, key=lambda x: x[0])[:k]
@@ -143,7 +147,7 @@ def get_object_scale_max_nearby(control_points, object_pos, k=3):
 def get_object_scale_weighted_median(control_points, object_pos):
     epsilon = 1e-8
     weighted_points = [
-        (point["scaleValue"], 1.0 / (distance(point["pos"], object_pos) + epsilon))
+        (point["value"], 1.0 / (distance(point["pos"], object_pos) + epsilon))
         for point in control_points
     ]
     weighted_points = sorted(weighted_points, key=lambda x: x[0])
@@ -156,7 +160,7 @@ def get_object_scale_weighted_median(control_points, object_pos):
         if cumulative_weight >= total_weight / 2:
             return scale
 
-    return sum(p["scaleValue"] for p in control_points) / len(control_points)
+    return sum(p["value"] for p in control_points) / len(control_points)
 
 # Harmonic Mean
 def get_object_scale_harmonic_mean(control_points, object_pos):
@@ -168,15 +172,18 @@ def get_object_scale_harmonic_mean(control_points, object_pos):
         dist = distance(point["pos"], object_pos)
         weight = 1.0 / (dist + epsilon)
 
-        weighted_inverse += weight / point["scaleValue"]
+        weighted_inverse += weight / point["value"]
         total_weight += weight
 
-    return (total_weight / weighted_inverse) if weighted_inverse > epsilon else sum(p["scaleValue"] for p in control_points) / len(control_points)
+    return (total_weight / weighted_inverse) if weighted_inverse > epsilon else sum(p["value"] for p in control_points) / len(control_points)
 
 # Prompt user for a scale value (simple implementation)
-def prompt_for_scale():
+def prompt_for_scale(defaultValue = default_scale):
     running = True
-    user_input = ""
+    user_input = str(defaultValue)
+    cursor_visible = True  # Cursor visibility toggle
+    cursor_timer = 0  # Timer for blinking effect
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -195,12 +202,25 @@ def prompt_for_scale():
                 elif event.key == pygame.K_ESCAPE:  # Cancel input
                     return None
 
-        # Display input prompt
-        screen.fill(BACKGROUND)
-        prompt_text = font.render("Enter scale value (ESC to cancel):", True, WHITE)
+        # Blinking cursor logic
+        cursor_timer += 1
+        if cursor_timer >= 30:  # Adjust blinking speed
+            cursor_visible = not cursor_visible
+            cursor_timer = 0
+
+        # Calculate the size of the prompt and input text
+        prompt_text = font.render("Enter point value (ESC to cancel):", True, WHITE)
         input_text = font.render(user_input, True, WHITE)
+        input_with_cursor = user_input + "|" if cursor_visible else user_input
+        input_text_with_cursor = font.render(input_with_cursor, True, WHITE)
+        prompt_rect = pygame.Rect(5, 5, max(prompt_text.get_width(), input_text_with_cursor.get_width()) + 10, 80)
+
+        # Draw a background rectangle for the prompt area
+        pygame.draw.rect(screen, BACKGROUND_BRIGHT, prompt_rect)
+
+        # Render prompt and input text
         screen.blit(prompt_text, (10, 10))
-        screen.blit(input_text, (10, 50))
+        screen.blit(input_text_with_cursor, (10, 50))
         pygame.display.flip()
 
 # Handle mouse clicks
@@ -211,13 +231,14 @@ def handle_mouse_click(event, control_points):
                 control_points.remove(point)  # Remove point if near
                 return
         # Otherwise, add a new point
-        control_points.append({"pos": event.pos, "scaleValue": 50})
+        control_points.append({"pos": event.pos, "value": default_scale})
     elif event.button == 3:  # Right click
         for point in control_points:
             if distance(event.pos, point["pos"]) <= tolerance_radius:
-                new_scale = prompt_for_scale()
+                new_scale = prompt_for_scale(point["value"])
                 if new_scale is not None:
-                    point["scaleValue"] = new_scale
+                    point["value"] = new_scale
+                    default_scale = new_scale
                 break
 
 # Main loop
@@ -270,19 +291,20 @@ while True:
     # Draw control points and radius
     for point in control_points:
         x, y = point["pos"]
-        size = point["scaleValue"]
+        size = point["value"]
         pygame.draw.circle(screen, CONTROLPOINT_RADIUS, (x, y), size, 1)
         pygame.draw.circle(screen, CONTROLPOINT, (x, y), 2)
         size_text = font.render(str(size), True, WHITE)
-        screen.blit(size_text, (x + size + 5, y - 10))
+        screen.blit(size_text, (x + 5, y - 10))
 
     pygame.draw.circle(screen, RESULT_RADIUS, mouse_pos, int(mouse_circle_radius), 1)
 
     # Display text
-    screen.blit(font.render(f"Radius: {mouse_circle_radius:.2f}", True, GREY), (mouse_x + int(mouse_circle_radius) + 10, mouse_y - 10))
-    screen.blit(font.render(f"Points: {len(control_points)}", True, GREY), (10, 10))
+    screen.blit(font.render(f"Scale: {mouse_circle_radius:.2f}", True, WHITE), (mouse_x + int(mouse_circle_radius) + 10, mouse_y - 10))
+    screen.blit(font.render(f"Number of points: {len(control_points)}", True, GREY), (10, 10))
     screen.blit(font.render(f"Mode: {mode_text}", True, GREY), (10, 40))
-    screen.blit(font.render("Controls: SPACE=Regenerate points, UP=Add point, DOWN=Remove point, B=Switch interpolation mode", True, WHITE), (10, 700))
+    screen.blit(font.render("Controls: SPACE=Regenerate points, UP=Add point, DOWN=Remove point, B=Switch interpolation mode", True, GREY), (10, 680))
+    screen.blit(font.render("                    Left click: Add/Remove point, Right click: Set point value", True, GREY), (10, 700))
 
     pygame.display.flip()
     clock.tick(60)
