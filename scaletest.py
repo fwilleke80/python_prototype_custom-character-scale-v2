@@ -10,12 +10,13 @@ WIDTH, HEIGHT = 1280, 720 # Screen dimensions
 DEFAULT_POINT_MIN_VALUE = 10 # Minimum value for random points
 DEFAULT_POINT_MAX_VALUE = 150 # Maximum value for random points
 DEFAULT_POINT_VALUE = 50 # Default point value for manually added points
-INITIAL_NUM_POINTS = 3 # Number of initial points
+INITIAL_NUM_POINTS = 5 # Number of initial points
 FONT_SIZE = 24 # Font size
 TOLERANCE_RADIUS = 10 # Tolerance for detecting clicks on existing points
-DRAW_SHADED = True # Draw circles filled & shaded
-DRAW_OUTLINES = True # Draw circle outlines (only has an effect if DRAW_SHADED == True)
 DRAW_ANTIALIASED = True # Use antialising for text and lines
+DRAW_SHADED = True # Draw circles filled & shaded
+DRAW_OUTLINES = False # Draw circle outlines (only has an effect if DRAW_SHADED == True)
+DRAW_VALUE_TEXT = True # Draw value texts next to points
 
 
 # Colors
@@ -329,12 +330,20 @@ while True:
             # Toggle antialiasing
             elif event.key == pygame.K_a:
                 DRAW_ANTIALIASED = not DRAW_ANTIALIASED
-            # Toggle outlines
-            elif event.key == pygame.K_d:
-                DRAW_OUTLINES = not DRAW_OUTLINES
             # Toggle shading
             elif event.key == pygame.K_s:
                 DRAW_SHADED = not DRAW_SHADED
+            # Toggle outlines
+            elif event.key == pygame.K_d:
+                DRAW_OUTLINES = not DRAW_OUTLINES
+            # Toggle value text
+            elif event.key == pygame.K_f:
+                DRAW_VALUE_TEXT = not DRAW_VALUE_TEXT
+
+            # Quit
+            elif event.key == pygame.K_q:
+                pygame.quit()
+                sys.exit()
         # Mouse input
         elif event.type == pygame.MOUSEBUTTONDOWN:
             handle_mouse_click(event, control_points, current_scale if current_scale != 0 else DEFAULT_POINT_VALUE)
@@ -446,28 +455,24 @@ while True:
 
         # Draw center point
         pygame.draw.circle(screen, CONTROLPOINT, (x, y), 2)
-        size_text = font.render(str(size), DRAW_ANTIALIASED, WHITE)
-        screen.blit(size_text, (x + 5, y - 10))
+        if DRAW_VALUE_TEXT:
+            screen.blit(font.render(str(size), DRAW_ANTIALIASED, WHITE), (x + 5, y - 10))
 
     # Display text at mouse cursor
-    screen.blit(font.render(f"Scale: {mouse_circle_radius:.2f}", DRAW_ANTIALIASED, WHITE), (mouse_x + int(mouse_circle_radius) + 10, mouse_y - 10))
-    screen.blit(font.render(f"{weighting_mode_text}", DRAW_ANTIALIASED, WHITE), (mouse_x + int(mouse_circle_radius) + 10, mouse_y + 10))
+    if DRAW_VALUE_TEXT:
+        screen.blit(font.render(f"Scale: {mouse_circle_radius:.2f}", DRAW_ANTIALIASED, WHITE), (mouse_x + int(mouse_circle_radius) + 10, mouse_y - 10))
+        screen.blit(font.render(f"{weighting_mode_text}", DRAW_ANTIALIASED, WHITE), (mouse_x + int(mouse_circle_radius) + 10, mouse_y + 10))
 
     # Display top text
     draw_outlined_text(screen, f"Number of points: {len(control_points)}", (10, 10), font, GREY, BLACK)
     draw_outlined_text(screen, f"Weighting mode: {weighting_mode_text}", (10, 30), font, GREY, BLACK)
     draw_outlined_text(screen, f"Remapping mode: {remapping_modes[remapping_mode]}", (10, 50), font, GREY, BLACK)
-    #screen.blit(font.render(f"Number of points: {len(control_points)}", DRAW_ANTIALIASED, GREY), (10, 10))
-    #screen.blit(font.render(f"Weighting mode: {weighting_mode_text}", DRAW_ANTIALIASED, GREY), (10, 30))
-    #screen.blit(font.render(f"Remapping mode: {remapping_modes[remapping_mode]}", DRAW_ANTIALIASED, GREY), (10, 50))
 
     # Display bottom text
-    draw_outlined_text(screen, "Display: A=Toggle antialiasing, S=Toggle shading, D=Toggle outlines", (10, 660), font, GREY, BLACK)
-    draw_outlined_text(screen, "Interpolation: Y=Next weighting mode, X=Previous weighting mode, C=Cycle color remapping mode", (10, 680), font, GREY, BLACK)
-    draw_outlined_text(screen, "Point management: SPACE=Regenerate points, UP=Add point, DOWN=Remove point, Left click: Add/Remove point, Right click: Set point value", (10, 700), font, GREY, BLACK)
-    #screen.blit(font.render("Display: A=Toggle antialiasing, S=Toggle shading, D=Toggle outlines", DRAW_ANTIALIASED, GREY), (10, 660))
-    #screen.blit(font.render("Interpolation: Y=Next weighting mode, X=Previous weighting mode, C=Cycle color remapping mode", DRAW_ANTIALIASED, GREY), (10, 680))
-    #screen.blit(font.render("Point management: SPACE=Regenerate points, UP=Add point, DOWN=Remove point, Left click: Add/Remove point, Right click: Set point value", DRAW_ANTIALIASED, GREY), (10, 700))
+    draw_outlined_text(screen, "Help", (10, 630), font, GREY, BLACK)
+    draw_outlined_text(screen, "Display: A=Toggle antialiasing, S=Toggle shading, D=Toggle outlines, F=Toggle value text", (10, 650), font, GREY, BLACK)
+    draw_outlined_text(screen, "Interpolation: Y=Next weighting mode, X=Previous weighting mode, C=Cycle color remapping mode", (10, 670), font, GREY, BLACK)
+    draw_outlined_text(screen, "Point management: SPACE=Regenerate points, UP=Add point, DOWN=Remove point, Left click: Add/Remove point, Right click: Set point value", (10, 690), font, GREY, BLACK)
 
     pygame.display.flip()
     clock.tick(60)
