@@ -5,6 +5,8 @@ import math
 import random
 
 
+PROTOTYPE_VERSION = 0.3
+
 # Settings
 WIDTH, HEIGHT = 1280, 720 # Screen dimensions
 DEFAULT_POINT_MIN_VALUE = 10 # Minimum value for random points
@@ -35,7 +37,7 @@ pygame.init()
 
 # Initialize screen
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Weighted character scaling v2 - Prototype")
+pygame.display.set_caption(f"Weighted character scaling v2 - Prototype v{PROTOTYPE_VERSION}")
 
 # Font setup
 font = pygame.font.Font(None, FONT_SIZE)  # Default font, size 24
@@ -240,12 +242,14 @@ def prompt_for_scale(defaultValue = DEFAULT_POINT_VALUE):
 # Handle mouse clicks
 def handle_mouse_click(event, control_points, new_scale):
     if event.button == 1:  # Left click
+        keys = pygame.key.get_pressed()
+        shift_pressed = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
         for point in control_points:
             if distance(event.pos, point["pos"]) <= TOLERANCE_RADIUS:
                 control_points.remove(point)  # Remove point if near
                 return
         # Otherwise, add a new point
-        control_points.append({"pos": event.pos, "value": new_scale})
+        control_points.append({"pos": event.pos, "value": random.randint(DEFAULT_POINT_MIN_VALUE, DEFAULT_POINT_MAX_VALUE) if shift_pressed else new_scale})
     elif event.button == 3:  # Right click
         for point in control_points:
             if distance(event.pos, point["pos"]) <= TOLERANCE_RADIUS:
@@ -378,8 +382,21 @@ while True:
         min_point_value = min(point["value"] for point in control_points)
         max_point_value = max(point["value"] for point in control_points)
 
+    # Sort by point value in ascending order
+    sorted_points = sorted(control_points, key=lambda p: p["value"])
+
+    # Find nearest control point
+    nearest_point_index = -1
+    nearest_point_distance = float('inf')
+    for i, point in enumerate(sorted_points):
+        dist = distance(point["pos"], mouse_pos)
+        if dist < nearest_point_distance:
+            nearest_point_distance = dist
+            nearest_point_index = i
+    if nearest_point_index > -1 and nearest_point_distance > TOLERANCE_RADIUS:
+        nearest_point_index = -1
+
     # Control points draw pass 1: Normalize point value and draw control points filled radius
-    sorted_points = sorted(control_points, key=lambda p: p["value"]) # Sort by point value in ascending order
     for point in sorted_points:
         x, y = point["pos"]
         size = point["value"]
@@ -402,7 +419,7 @@ while True:
                 pygame.draw.circle(screen, radius_color, (x, y), size)
 
     # Prettier: Draw circle around mouse cursor (filled with adjusted brightness)
-    if control_points:
+    if sorted_points:
         if DRAW_SHADED:
             # Normalize the radius to compute the color
             if max_point_value > min_point_value:  # Avoid division by zero
@@ -435,7 +452,7 @@ while True:
         pygame.draw.circle(screen, MOUSE_CENTER, (mouse_x, mouse_y), 2)
 
     # Control points draw pass 2: Draw control points center, outline, and text
-    for point in control_points:
+    for point_index, point in enumerate(sorted_points):
         x, y = point["pos"]
         size = point["value"]
 
@@ -446,12 +463,17 @@ while True:
                     pygame.gfxdraw.aacircle(screen, x, y, size, BLACK) # Antialiased outline
                 else:
                     pygame.draw.circle(screen, BLACK, (x, y), size, 1)
+            if nearest_point_index == point_index:
+                pygame.draw.circle(screen, WHITE, (x, y), TOLERANCE_RADIUS)
         else:
             # Draw simple circle outline
             if DRAW_ANTIALIASED:
                 pygame.gfxdraw.aacircle(screen, x, y, size, CONTROLPOINT_RADIUS) # Antialiased outline
-            else:
+                if nearest_point_index == point_index:
+                    pygame.gfxdraw.aacircle(screen, x, y, TOLERANCE_RADIUS, WHITE) # Antialiased outline            else:
                 pygame.draw.circle(screen, CONTROLPOINT_RADIUS, (x, y), size, 1)
+                if nearest_point_index == point_index:
+                    pygame.draw.circle(screen, WHITE, (x, y), TOLERANCE_RADIUS, 1)
 
         # Draw center point
         pygame.draw.circle(screen, CONTROLPOINT, (x, y), 2)
@@ -469,10 +491,11 @@ while True:
     draw_outlined_text(screen, f"Remapping mode: {remapping_modes[remapping_mode]}", (10, 50), font, GREY, BLACK)
 
     # Display bottom text
-    draw_outlined_text(screen, "Help", (10, 630), font, GREY, BLACK)
-    draw_outlined_text(screen, "Display: A=Toggle antialiasing, S=Toggle shading, D=Toggle outlines, F=Toggle value text", (10, 650), font, GREY, BLACK)
-    draw_outlined_text(screen, "Interpolation: Y=Next weighting mode, X=Previous weighting mode, C=Cycle color remapping mode", (10, 670), font, GREY, BLACK)
-    draw_outlined_text(screen, "Point management: SPACE=Regenerate points, UP=Add point, DOWN=Remove point, Left click: Add/Remove point, Right click: Set point value", (10, 690), font, GREY, BLACK)
+    draw_outlined_text(screen, "Help", (10, 610), font, GREY, BLACK)
+    draw_outlined_text(screen, "Display: A=Toggle antialiasing, S=Toggle shading, D=Toggle outlines, F=Toggle value text", (10, 630), font, GREY, BLACK)
+    draw_outlined_text(screen, "Interpolation: Y=Next weighting mode, X=Previous weighting mode, C=Cycle color remapping mode", (10, 650), font, GREY, BLACK)
+    draw_outlined_text(screen, "Point management: SPACE=Regenerate points, UP=Add point, DOWN=Remove point", (10, 670), font, GREY, BLACK)
+    draw_outlined_text(screen, "                                        Left click: Add/Remove point (hold SHIFT to use random point value), Right click: Set point value", (10, 690), font, GREY, BLACK)
 
     pygame.display.flip()
     clock.tick(60)
