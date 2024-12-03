@@ -224,14 +224,14 @@ def prompt_for_scale(defaultValue = default_scale):
         pygame.display.flip()
 
 # Handle mouse clicks
-def handle_mouse_click(event, control_points):
+def handle_mouse_click(event, control_points, new_scale):
     if event.button == 1:  # Left click
         for point in control_points:
             if distance(event.pos, point["pos"]) <= tolerance_radius:
                 control_points.remove(point)  # Remove point if near
                 return
         # Otherwise, add a new point
-        control_points.append({"pos": event.pos, "value": default_scale})
+        control_points.append({"pos": event.pos, "value": new_scale})
     elif event.button == 3:  # Right click
         for point in control_points:
             if distance(event.pos, point["pos"]) <= tolerance_radius:
@@ -243,6 +243,7 @@ def handle_mouse_click(event, control_points):
 
 # Main loop
 clock = pygame.time.Clock()
+current_scale = default_scale
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -262,7 +263,7 @@ while True:
             elif event.key == pygame.K_b:
                 weighting_mode = (weighting_mode + 1) % len(weighting_modes)
         if event.type == pygame.MOUSEBUTTONDOWN:
-            handle_mouse_click(event, control_points)
+            handle_mouse_click(event, control_points, current_scale)
 
     # Query mouse position
     mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -284,6 +285,7 @@ while True:
         mouse_circle_radius = get_object_scale_weighted_median(control_points, mouse_pos)
     elif weighting_mode == 6:
         mouse_circle_radius = get_object_scale_harmonic_mean(control_points, mouse_pos)
+    current_scale = int(mouse_circle_radius)
 
     # Clear screen
     screen.fill(BACKGROUND)
