@@ -16,7 +16,7 @@ GREY = (160, 160, 160)
 BACKGROUND = (32, 32, 96)
 BACKGROUND_BRIGHT = (64, 64, 192)
 CONTROLPOINT = (128, 0, 0)
-CONTROLPOINT_RADIUS = (255, 64, 64)
+CONTROLPOINT_RADIUS = (255, 160, 64)
 RESULT_RADIUS = (255, 255, 0)
 
 # Initialize screen
@@ -50,6 +50,10 @@ def distance(point1, point2):
     dx = point1[0] - point2[0]
     dy = point1[1] - point2[1]
     return math.sqrt(dx ** 2 + dy ** 2)
+
+# Settings
+draw_outlines = True
+draw_shaded = True
 
 # Weighting modes
 weighting_mode = 0
@@ -268,12 +272,14 @@ def map_01_to_range(val: float, minimum: float, maximum: float) -> float:
 # Main loop
 clock = pygame.time.Clock()
 current_scale = default_scale
-draw_outlines = True
 while True:
+    # Handle events
     for event in pygame.event.get():
+        # Quit
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
+        # Keyboard input
         if event.type == pygame.KEYDOWN:
             # Regenerate points
             if event.key == pygame.K_SPACE:
@@ -290,13 +296,17 @@ while True:
             # Cycle interpolation mode backward
             elif event.key == pygame.K_n:
                 weighting_mode = (weighting_mode - 1) % len(weighting_modes)
-            # Toggle outlines
-            elif event.key == pygame.K_y:
-                draw_outlines = not draw_outlines
             # Cycle color remapping mode
-            elif event.key == pygame.K_x:
+            elif event.key == pygame.K_y:
                 remapping_mode = (remapping_mode + 1) % 3
-        if event.type == pygame.MOUSEBUTTONDOWN:
+            # Toggle outlines
+            elif event.key == pygame.K_x:
+                draw_outlines = not draw_outlines
+            # Toggle shading
+            elif event.key == pygame.K_c:
+                draw_shaded = not draw_shaded
+        # Mouse input
+        elif event.type == pygame.MOUSEBUTTONDOWN:
             handle_mouse_click(event, control_points, current_scale if current_scale != 0 else default_scale)
 
     # Query mouse position
@@ -331,60 +341,64 @@ while True:
 
     # Control points draw pass 1: Normalize point value and draw control points filled radius
     sorted_points = sorted(control_points, key=lambda p: p["value"]) # Sort by point value in ascending order
-
     for point in sorted_points:
         x, y = point["pos"]
         size = point["value"]
 
-        # Normalize the value
-        if max_point_value > min_point_value:  # Avoid division by zero
-            normalized_value = (size - min_point_value) / (max_point_value - min_point_value)
-            if remapping_mode == 1:
-                # Square value
-                normalized_value = normalized_value * normalized_value
-            elif remapping_mode == 2:
-                # Root value
-                normalized_value = math.sqrt(normalized_value)
+        if draw_shaded:
+            # Normalize the value
+            if max_point_value > min_point_value:  # Avoid division by zero
+                normalized_value = (size - min_point_value) / (max_point_value - min_point_value)
+                if remapping_mode == 1:
+                    # Square value
+                    normalized_value = normalized_value * normalized_value
+                elif remapping_mode == 2:
+                    # Root value
+                    normalized_value = math.sqrt(normalized_value)
+            else:
+                normalized_value = 0.0
 
-        else:
-            normalized_value = 0.0
+            # Adjust brightness based on normalized value
+            radius_color = blend_color(BACKGROUND, CONTROLPOINT_RADIUS, map_01_to_range(normalized_value, 0.15, 1.0))
 
-        # Adjust brightness based on normalized value
-        radius_color = blend_color(BACKGROUND, CONTROLPOINT_RADIUS, map_01_to_range(normalized_value, 0.15, 1.0))
-
-        # Draw circle filled with adjusted brightness
-        pygame.draw.circle(screen, radius_color, (x, y), size)
-
-    # Simple: Draw circle around mouse cursor
-    # pygame.draw.circle(screen, RESULT_RADIUS, mouse_pos, int(mouse_circle_radius), 1)
+            # Draw circle filled with adjusted brightness
+            pygame.draw.circle(screen, radius_color, (x, y), size)
 
     # Prettier: Draw circle around mouse cursor (filled with adjusted brightness)
     if control_points:
-        # Normalize the radius to compute the color
-        if max_point_value > min_point_value:  # Avoid division by zero
-            normalized_mouse_value = (mouse_circle_radius - min_point_value) / (max_point_value - min_point_value)
+        if draw_shaded:
+            # Normalize the radius to compute the color
+            if max_point_value > min_point_value:  # Avoid division by zero
+                normalized_mouse_value = (mouse_circle_radius - min_point_value) / (max_point_value - min_point_value)
+            else:
+                normalized_mouse_value = 0.0
+
+            # Adjust brightness based on normalized value
+            mouse_color = blend_color(BACKGROUND, CONTROLPOINT_RADIUS, map_01_to_range(normalized_mouse_value, 0.15, 1.0))
+
+            # Draw the filled circle
+            pygame.draw.circle(screen, mouse_color, mouse_pos, int(mouse_circle_radius))
+
+            # Draw outline
+            if draw_outlines:
+                pygame.draw.circle(screen, BLACK, mouse_pos, int(mouse_circle_radius), 1)
         else:
-            normalized_mouse_value = 0.0
-
-        # Adjust brightness based on normalized value
-        mouse_color = blend_color(BACKGROUND, CONTROLPOINT_RADIUS, map_01_to_range(normalized_mouse_value, 0.15, 1.0))
-
-        # Draw the filled circle
-        pygame.draw.circle(screen, mouse_color, mouse_pos, int(mouse_circle_radius))
-
-        # Draw outline
-        if draw_outlines:
-            pygame.draw.circle(screen, BLACK, mouse_pos, int(mouse_circle_radius), 1)
+            # Draw simple outline
+            pygame.draw.circle(screen, RESULT_RADIUS, mouse_pos, int(mouse_circle_radius), 1)
 
     # Control points draw pass 2: Draw control points center, outline, and text
     for point in control_points:
         x, y = point["pos"]
         size = point["value"]
 
-        # Draw circle outline
-        if draw_outlines:
-            pygame.draw.circle(screen, BLACK, (x, y), size, 1)
-        
+        if draw_shaded:
+            # Draw circle outline
+            if draw_outlines:
+                pygame.draw.circle(screen, BLACK, (x, y), size, 1)
+        else:
+            # Draw simple circle outline
+            pygame.draw.circle(screen, CONTROLPOINT_RADIUS, (x, y), size, 1)
+
         # Draw center point
         pygame.draw.circle(screen, CONTROLPOINT, (x, y), 2)
         size_text = font.render(str(size), True, WHITE)
@@ -400,7 +414,7 @@ while True:
     screen.blit(font.render(f"Remapping mode: {remapping_modes[remapping_mode]}", True, GREY), (10, 60))
 
     # Display bottom text
-    screen.blit(font.render("Display: Y=Toggle outlines, X=Cycle color remapping", True, GREY), (10, 660))
+    screen.blit(font.render("Display: Y=Cycle color remapping, X=Toggle outlines, C=Toggle shading", True, GREY), (10, 660))
     screen.blit(font.render("Interpolation: B=Next weighting mode, N=Previous weighting mode", True, GREY), (10, 680))
     screen.blit(font.render("Point management: SPACE=Regenerate points, UP=Add point, DOWN=Remove point, Left click: Add/Remove point, Right click: Set point value", True, GREY), (10, 700))
 
