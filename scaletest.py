@@ -263,7 +263,7 @@ while True:
             elif event.key == pygame.K_b:
                 weighting_mode = (weighting_mode + 1) % len(weighting_modes)
         if event.type == pygame.MOUSEBUTTONDOWN:
-            handle_mouse_click(event, control_points, current_scale)
+            handle_mouse_click(event, control_points, current_scale if current_scale != 0 else default_scale)
 
     # Query mouse position
     mouse_x, mouse_y = pygame.mouse.get_pos()
