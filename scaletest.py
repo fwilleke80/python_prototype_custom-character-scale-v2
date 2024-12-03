@@ -205,7 +205,7 @@ def prompt_for_scale(defaultValue = DEFAULT_POINT_VALUE):
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:  # Confirm input
                     try:
-                        return int(user_input)
+                        return int(min(WIDTH, HEIGHT, int(user_input)))
                     except ValueError:
                         return None
                 elif event.key == pygame.K_BACKSPACE:  # Delete last character
@@ -280,6 +280,19 @@ def remap_value(value, mode):
     # Return unchanged value
     return value
 
+# Draws text with an outline for better visibility.
+def draw_outlined_text(surface, text, position, font, text_color, outline_color):
+    outline_offset = 1  # Thickness of the outline
+    for dx in [-outline_offset, 0, outline_offset]:
+        for dy in [-outline_offset, 0, outline_offset]:
+            if dx != 0 or dy != 0:
+                outline_surface = font.render(text, DRAW_ANTIALIASED, outline_color)
+                surface.blit(outline_surface, (position[0] + dx, position[1] + dy))
+
+    # Draw the main text on top
+    text_surface = font.render(text, True, text_color)
+    surface.blit(text_surface, position)
+
 
 # Main loop
 clock = pygame.time.Clock()
@@ -302,24 +315,26 @@ while True:
             # Remove point
             elif event.key == pygame.K_DOWN and len(control_points) > 1:
                 control_points.pop()
+
             # Cycle interpolation mode forward
-            elif event.key == pygame.K_b:
+            elif event.key == pygame.K_y:
                 weighting_mode = (weighting_mode + 1) % len(weighting_modes)
             # Cycle interpolation mode backward
-            elif event.key == pygame.K_n:
+            elif event.key == pygame.K_x:
                 weighting_mode = (weighting_mode - 1) % len(weighting_modes)
             # Cycle color remapping mode
-            elif event.key == pygame.K_y:
-                remapping_mode = (remapping_mode + 1) % 3
-            # Toggle outlines
-            elif event.key == pygame.K_x:
-                DRAW_OUTLINES = not DRAW_OUTLINES
-            # Toggle shading
             elif event.key == pygame.K_c:
-                DRAW_SHADED = not DRAW_SHADED
+                remapping_mode = (remapping_mode + 1) % 3
+
             # Toggle antialiasing
             elif event.key == pygame.K_a:
                 DRAW_ANTIALIASED = not DRAW_ANTIALIASED
+            # Toggle outlines
+            elif event.key == pygame.K_d:
+                DRAW_OUTLINES = not DRAW_OUTLINES
+            # Toggle shading
+            elif event.key == pygame.K_s:
+                DRAW_SHADED = not DRAW_SHADED
         # Mouse input
         elif event.type == pygame.MOUSEBUTTONDOWN:
             handle_mouse_click(event, control_points, current_scale if current_scale != 0 else DEFAULT_POINT_VALUE)
@@ -439,14 +454,20 @@ while True:
     screen.blit(font.render(f"{weighting_mode_text}", DRAW_ANTIALIASED, WHITE), (mouse_x + int(mouse_circle_radius) + 10, mouse_y + 10))
 
     # Display top text
-    screen.blit(font.render(f"Number of points: {len(control_points)}", DRAW_ANTIALIASED, GREY), (10, 10))
-    screen.blit(font.render(f"Weighting mode: {weighting_mode_text}", DRAW_ANTIALIASED, GREY), (10, 30))
-    screen.blit(font.render(f"Remapping mode: {remapping_modes[remapping_mode]}", DRAW_ANTIALIASED, GREY), (10, 50))
+    draw_outlined_text(screen, f"Number of points: {len(control_points)}", (10, 10), font, GREY, BLACK)
+    draw_outlined_text(screen, f"Weighting mode: {weighting_mode_text}", (10, 30), font, GREY, BLACK)
+    draw_outlined_text(screen, f"Remapping mode: {remapping_modes[remapping_mode]}", (10, 50), font, GREY, BLACK)
+    #screen.blit(font.render(f"Number of points: {len(control_points)}", DRAW_ANTIALIASED, GREY), (10, 10))
+    #screen.blit(font.render(f"Weighting mode: {weighting_mode_text}", DRAW_ANTIALIASED, GREY), (10, 30))
+    #screen.blit(font.render(f"Remapping mode: {remapping_modes[remapping_mode]}", DRAW_ANTIALIASED, GREY), (10, 50))
 
     # Display bottom text
-    screen.blit(font.render("Display: Y=Cycle color remapping, X=Toggle outlines, C=Toggle shading, A=Toggle antialiasing", DRAW_ANTIALIASED, GREY), (10, 660))
-    screen.blit(font.render("Interpolation: B=Next weighting mode, N=Previous weighting mode", DRAW_ANTIALIASED, GREY), (10, 680))
-    screen.blit(font.render("Point management: SPACE=Regenerate points, UP=Add point, DOWN=Remove point, Left click: Add/Remove point, Right click: Set point value", DRAW_ANTIALIASED, GREY), (10, 700))
+    draw_outlined_text(screen, "Display: A=Toggle antialiasing, S=Toggle shading, D=Toggle outlines", (10, 660), font, GREY, BLACK)
+    draw_outlined_text(screen, "Interpolation: Y=Next weighting mode, X=Previous weighting mode, C=Cycle color remapping mode", (10, 680), font, GREY, BLACK)
+    draw_outlined_text(screen, "Point management: SPACE=Regenerate points, UP=Add point, DOWN=Remove point, Left click: Add/Remove point, Right click: Set point value", (10, 700), font, GREY, BLACK)
+    #screen.blit(font.render("Display: A=Toggle antialiasing, S=Toggle shading, D=Toggle outlines", DRAW_ANTIALIASED, GREY), (10, 660))
+    #screen.blit(font.render("Interpolation: Y=Next weighting mode, X=Previous weighting mode, C=Cycle color remapping mode", DRAW_ANTIALIASED, GREY), (10, 680))
+    #screen.blit(font.render("Point management: SPACE=Regenerate points, UP=Add point, DOWN=Remove point, Left click: Add/Remove point, Right click: Set point value", DRAW_ANTIALIASED, GREY), (10, 700))
 
     pygame.display.flip()
     clock.tick(60)
